@@ -4,6 +4,7 @@ import (
 	"time"
 )
 
+// MinuteTicker is a simple Ticker that ticks every minute
 func MinuteTicker() *time.Ticker {
 	c := make(chan time.Time, 1)
 	t := &time.Ticker{C: c}
