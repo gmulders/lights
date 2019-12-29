@@ -54,3 +54,62 @@ sudo systemctl stop nats
 sudo systemctl restart nats
 ```
 
+# Install sunset
+
+```
+sudo mkdir -p /opt/sunset/bin
+sudo mkdir /etc/opt/sunset
+```
+
+Create `/etc/systemd/system/sunset.service`
+```
+[Unit]
+Description=Sunset events
+After=nats.service
+
+[Service]
+ExecStart=/opt/sunset/bin/sunset
+WorkingDirectory=/etc/opt/sunset
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+#User=nats
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable it so that it is started on boot:
+```
+sudo systemctl enable sunset
+```
+
+# Install lightcontroller
+
+```
+sudo mkdir -p /opt/lightcontroller/bin
+sudo mkdir /etc/opt/lightcontroller
+```
+
+Create `/etc/systemd/system/lightcontroller.service`
+```
+[Unit]
+Description=Light controller
+After=nats.service
+
+[Service]
+ExecStart=/opt/lightcontroller/bin/lightcontroller
+WorkingDirectory=/etc/opt/lightcontroller
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+#User=nats
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable it so that it is started on boot:
+```
+sudo systemctl enable lightcontroller
+```
