@@ -16,8 +16,8 @@ func main() {
 	}
 
 	for t := range lights.MinuteTicker().C {
-		isSunsetNew, err := lights.IsSunSet(time.Now())
-
+		isSunsetNew, err := lights.IsSunSet(t)
+		// log.Printf("%s, old: %t, new: %t", t.Format(time.RFC3339), isSunset, isSunsetNew)
 		if err != nil {
 			log.Fatal(err)
 			break

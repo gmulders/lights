@@ -53,6 +53,13 @@ func main() {
 
 	log.SetFlags(log.LstdFlags)
 
+	for t := range lights.MinuteTicker().C {
+		currentTimeOnly := t.Hour() * 100 + t.Minute()
+		if currentTimeOnly == 2100 {
+			bridge.SetLightState(2, huego.State{On: false})
+		}
+	}
+
 	runtime.Goexit()
 }
 
