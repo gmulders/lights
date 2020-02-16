@@ -11,6 +11,7 @@ import (
 	"log"
 	"runtime"
 	"strings"
+	"time"
 )
 
 func main() {
@@ -27,22 +28,38 @@ func main() {
 		log.Fatal(err)
 	}
 
+	go updateLightsStatus(bridge)
+
 	// Connect to NATS
 	nc, err := nats.Connect(nats.DefaultURL)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	nc.Subscribe("sunset", func(msg *nats.Msg) {
-		bridge.SetLightState(2, huego.State{On: true, Bri: 170, Sat: 0})
+	nc.Subscribe("lights-update", func(msg *nats.Msg) {
+		lights := make([]lights.Light, 0)
+		if err := json.Unmarshal(msg.Data, &lights); err != nil {
+			log.Print(err)
+		}
+
+		for _, light := range lights {
+			if light.ID == 0 {
+				id, err := findLightIDByName(light.Name)
+				if err != nil {
+					log.Print(err)
+				}
+				light.ID = id
+			}
+			bridge.SetLightState(light.ID, huego.State{On: light.On, Bri: light.Bri, Hue: light.Hue, Sat: light.Sat})
+		}
 	})
 
-	nc.Subscribe("lights-update", func(msg *nats.Msg) {
+	nc.Subscribe("lights-status-query", func(msg *nats.Msg) {
 		bytes, err := getAllLightsAsJSON(bridge)
 		if err != nil {
-			log.Fatal(err)
+			log.Print(err)
 		}
-		nc.Publish("lights-status", bytes)
+		nc.Publish("lights-status-response", bytes)
 	})
 
 	nc.Flush()
@@ -54,7 +71,7 @@ func main() {
 	log.SetFlags(log.LstdFlags)
 
 	for t := range lights.MinuteTicker().C {
-		currentTimeOnly := t.Hour() * 100 + t.Minute()
+		currentTimeOnly := t.Hour()*100 + t.Minute()
 		if currentTimeOnly == 2100 {
 			bridge.SetLightState(2, huego.State{On: false})
 		}
@@ -103,15 +120,19 @@ func connectToHueBridge(config *config) (*huego.Bridge, error) {
 	return bridge.Login(config.username), nil
 }
 
+var currentLights []huego.Light
+
 func getAllLightsAsJSON(bridge *huego.Bridge) ([]byte, error) {
-	oldLights, err := bridge.GetLights()
+	bridgeLights, err := bridge.GetLights()
 
 	if err != nil {
 		return nil, fmt.Errorf("could not get lights %s", err)
 	}
 
-	newLights := make([]lights.Light, len(oldLights))
-	for index, light := range oldLights {
+	currentLights = bridgeLights
+
+	newLights := make([]lights.Light, len(currentLights))
+	for index, light := range currentLights {
 		newLights[index] = lights.Light{
 			ID:   light.ID,
 			Name: light.Name,
@@ -128,4 +149,25 @@ func getAllLightsAsJSON(bridge *huego.Bridge) ([]byte, error) {
 	}
 
 	return b, nil
+}
+
+func updateLightsStatus(bridge *huego.Bridge) {
+	ticker := time.NewTicker(5 * time.Minute)
+
+	for ; true; <-ticker.C {
+		bridgeLights, err := bridge.GetLights()
+		if err != nil {
+			log.Print(fmt.Errorf("could not get lights %s", err))
+		}
+		currentLights = bridgeLights
+	}
+}
+
+func findLightIDByName(name string) (int, error) {
+	for _, light := range currentLights {
+		if light.Name == name {
+			return light.ID, nil
+		}
+	}
+	return 0, fmt.Errorf("light with name '%s' could not be found", name)
 }
