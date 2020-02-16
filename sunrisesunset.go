@@ -2,8 +2,8 @@ package lights
 
 import (
 	"github.com/kelvins/sunrisesunset"
-	"time"
 	"log"
+	"time"
 )
 
 // IsSunSet returns wether the sun has set at the given time.
