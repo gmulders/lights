@@ -57,8 +57,11 @@ sudo systemctl restart nats
 # Install sunset
 
 ```
+cd cmd/sunset
+go build
 sudo mkdir -p /opt/sunset/bin
 sudo mkdir /etc/opt/sunset
+sudo cp sunset /opt/sunset/bin
 ```
 
 Create `/etc/systemd/system/sunset.service`
@@ -79,16 +82,20 @@ Restart=always
 WantedBy=multi-user.target
 ```
 
-Enable it so that it is started on boot:
+Start and enable it so that it is started on boot:
 ```
+sudo systemctl start sunset
 sudo systemctl enable sunset
 ```
 
 # Install lightcontroller
 
 ```
+cd cmd/lightcontroller
+go build
 sudo mkdir -p /opt/lightcontroller/bin
 sudo mkdir /etc/opt/lightcontroller
+sudo cp lightcontroller /opt/lightcontroller/bin
 ```
 
 Create `/etc/systemd/system/lightcontroller.service`
@@ -109,7 +116,42 @@ Restart=always
 WantedBy=multi-user.target
 ```
 
-Enable it so that it is started on boot:
+Start and enable it so that it is started on boot:
 ```
+sudo systemctl start lightcontroller
 sudo systemctl enable lightcontroller
+```
+
+# Install controller
+
+```
+cd cmd/controller
+go build
+sudo mkdir -p /opt/controller/bin
+sudo mkdir /etc/opt/controller
+sudo cp controller /opt/controller/bin
+```
+
+Create `/etc/systemd/system/controller.service`
+```
+[Unit]
+Description=Controller
+After=nats.service
+
+[Service]
+ExecStart=/opt/controller/bin/controller
+WorkingDirectory=/etc/opt/controller
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+#User=nats
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Start and enable it so that it is started on boot:
+```
+sudo systemctl start controller
+sudo systemctl enable controller
 ```
