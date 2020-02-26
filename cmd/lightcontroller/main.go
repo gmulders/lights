@@ -39,6 +39,7 @@ func main() {
 	defer nc.Close()
 
 	nc.Subscribe("lights-update", func(msg *nats.Msg) {
+		log.Info("Receiving lights-update event")
 		lights := make([]lights.Light, 0)
 		if err := json.Unmarshal(msg.Data, &lights); err != nil {
 			log.Errorf("Unable to unmarshal the lights JSON: %v", err)
@@ -51,11 +52,13 @@ func main() {
 	})
 
 	nc.Subscribe("lights-status-query", func(msg *nats.Msg) {
+		log.Info("Receiving lights-status-query event")
 		bytes, err := getAllLightsAsJSON(bridge)
 		if err != nil {
 			log.Error(err)
 			return
 		}
+		log.Info("Publishing the current lights")
 		nc.Publish("lights-status-response", bytes)
 	})
 
@@ -179,6 +182,7 @@ func updateLight(bridge *huego.Bridge, light lights.Light) {
 		Sat: light.Sat,
 	}
 
+	log.Infof("Update light id %d state {On: %t, Bri: %d, Hue: %d, Sat: %d}", light.ID, light.On, light.Bri, light.Hue, light.Sat)
 	_, err := bridge.SetLightState(light.ID, state)
 
 	if err != nil {
