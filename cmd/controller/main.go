@@ -2,11 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
+
 	"github.com/gmulders/lights"
 	nats "github.com/nats-io/nats.go"
-	"log"
-	"runtime"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -43,20 +42,21 @@ func main() {
 	// Connect to NATS
 	nc, err := nats.Connect(nats.DefaultURL)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Could not connect to NATS: %v", err)
 	}
 
+	defer nc.Close()
+
 	nc.Subscribe("sunset", func(msg *nats.Msg) {
+		log.Info("Received sunset event")
 		updateLights(nc, sunsetLights)
 	})
 
 	nc.Flush()
 
 	if err := nc.LastError(); err != nil {
-		log.Fatal(err)
+		log.Errorf("Unexpected exception from NATS: %v", err)
 	}
-
-	log.SetFlags(log.LstdFlags)
 
 	for t := range lights.MinuteTicker().C {
 		currentTimeOnly := t.Hour()*100 + t.Minute()
@@ -65,17 +65,20 @@ func main() {
 		} else if currentTimeOnly == 2100 {
 			updateLights(nc, time2100Lights)
 		}
-	}
 
-	runtime.Goexit()
+		nc.Flush()
+	}
 }
 
 func updateLights(nc *nats.Conn, lights []lights.Light) {
 	bytes, err := json.Marshal(lights)
 
 	if err != nil {
-		log.Print(fmt.Errorf("could not marshal to JSON %s", err))
+		log.Errorf("Could not marshal to JSON %v", err)
+		return
 	}
+
+	log.Infof("Sending request for 'lights-update' %s", string(bytes))
 
 	nc.Publish("lights-update", bytes)
 }

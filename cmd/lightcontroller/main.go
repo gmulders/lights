@@ -7,25 +7,26 @@ import (
 	"github.com/amimof/huego"
 	"github.com/gmulders/lights"
 	nats "github.com/nats-io/nats.go"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"log"
-	"runtime"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 )
 
 func main() {
-
 	config, err := readConfig()
 
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Could not read config: %v", err)
 	}
 
 	bridge, err := connectToHueBridge(config)
 
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Could not connect to bridge: %v", err)
 	}
 
 	go updateLightsStatus(bridge)
@@ -33,31 +34,27 @@ func main() {
 	// Connect to NATS
 	nc, err := nats.Connect(nats.DefaultURL)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Could not connect to NATS: %v", err)
 	}
+	defer nc.Close()
 
 	nc.Subscribe("lights-update", func(msg *nats.Msg) {
 		lights := make([]lights.Light, 0)
 		if err := json.Unmarshal(msg.Data, &lights); err != nil {
-			log.Print(err)
+			log.Errorf("Unable to unmarshal the lights JSON: %v", err)
+			return
 		}
 
 		for _, light := range lights {
-			if light.ID == 0 {
-				id, err := findLightIDByName(light.Name)
-				if err != nil {
-					log.Print(err)
-				}
-				light.ID = id
-			}
-			bridge.SetLightState(light.ID, huego.State{On: light.On, Bri: light.Bri, Hue: light.Hue, Sat: light.Sat})
+			updateLight(bridge, light)
 		}
 	})
 
 	nc.Subscribe("lights-status-query", func(msg *nats.Msg) {
 		bytes, err := getAllLightsAsJSON(bridge)
 		if err != nil {
-			log.Print(err)
+			log.Error(err)
+			return
 		}
 		nc.Publish("lights-status-response", bytes)
 	})
@@ -65,19 +62,12 @@ func main() {
 	nc.Flush()
 
 	if err := nc.LastError(); err != nil {
-		log.Fatal(err)
+		log.Error(err)
 	}
 
-	log.SetFlags(log.LstdFlags)
-
-	for t := range lights.MinuteTicker().C {
-		currentTimeOnly := t.Hour()*100 + t.Minute()
-		if currentTimeOnly == 2100 {
-			bridge.SetLightState(2, huego.State{On: false})
-		}
-	}
-
-	runtime.Goexit()
+	termChan := make(chan os.Signal)
+	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
+	<-termChan // Blocks here until either SIGINT or SIGTERM is received.
 }
 
 type config struct {
@@ -170,4 +160,28 @@ func findLightIDByName(name string) (int, error) {
 		}
 	}
 	return 0, fmt.Errorf("light with name '%s' could not be found", name)
+}
+
+func updateLight(bridge *huego.Bridge, light lights.Light) {
+	if light.ID == 0 {
+		id, err := findLightIDByName(light.Name)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		light.ID = id
+	}
+
+	state := huego.State{
+		On:  light.On,
+		Bri: light.Bri,
+		Hue: light.Hue,
+		Sat: light.Sat,
+	}
+
+	_, err := bridge.SetLightState(light.ID, state)
+
+	if err != nil {
+		log.Errorf("Could not set the state of the light %d: %v", light.ID, err)
+	}
 }
