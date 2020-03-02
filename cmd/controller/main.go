@@ -73,6 +73,8 @@ func main() {
 		currentTimeOnly := t.Hour()*100 + t.Minute()
 		if currentTimeOnly == 2030 {
 			updateLights(nc, time2030Lights)
+		} else if currentTimeOnly == 2045 {
+			updateLights(nc, time2045Lights)
 		} else if currentTimeOnly == 2100 {
 			updateLights(nc, time2100Lights)
 		}
