@@ -19,7 +19,11 @@ var (
 		lights.Light{
 			ID:  5,
 			On:  true,
-			Bri: 136,
+			Bri: 254,
+		},
+		lights.Light{
+			ID:  6,
+			On:  true,
 		},
 	}
 
@@ -27,6 +31,13 @@ var (
 		lights.Light{
 			ID: 2,
 			On: false,
+		},
+	}
+
+	time2045Lights = []lights.Light{
+		lights.Light{
+			ID:  6,
+			On:  false,
 		},
 	}
 
