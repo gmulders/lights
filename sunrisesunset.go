@@ -2,7 +2,6 @@ package lights
 
 import (
 	"github.com/kelvins/sunrisesunset"
-	"log"
 	"time"
 )
 
@@ -21,14 +20,11 @@ func IsSunSet(t time.Time) (bool, error) {
 
 	_, sunset, err := p.GetSunriseSunset()
 
-	sunset = time.Date(t.Year(), t.Month(), t.Day(), sunset.Hour(), sunset.Minute(), sunset.Second(), sunset.Nanosecond(), time.UTC)
-
 	if err != nil {
-		log.Printf("Bla %s", err)
 		return true, err
 	}
 
-	// log.Printf("Current time: %s, sunset time: %s", t.Format(time.RFC3339), sunset.Format(time.RFC3339))
+	sunset = time.Date(t.Year(), t.Month(), t.Day(), sunset.Hour(), sunset.Minute(), sunset.Second(), sunset.Nanosecond(), time.UTC)
 
 	return t.After(sunset), nil
 }

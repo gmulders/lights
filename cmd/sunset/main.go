@@ -8,14 +8,14 @@ import (
 )
 
 func main() {
-	isSunset, err := lights.IsSunSet(time.Now())
+	isSunset, err := lights.IsSunSet(time.Now().UTC())
 
 	if err != nil {
 		log.Errorf("Could not determine isSunset, assuming the default (true): %v", err)
 	}
 
 	for t := range lights.MinuteTicker().C {
-		isSunsetNew, err := lights.IsSunSet(t)
+		isSunsetNew, err := lights.IsSunSet(t.UTC())
 		if err != nil {
 			log.Errorf("Could not determine isSunset: %v", err)
 		}
