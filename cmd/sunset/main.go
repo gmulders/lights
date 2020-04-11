@@ -26,7 +26,6 @@ func main() {
 
 		isSunset = isSunsetNew
 	}
-
 }
 
 func sendSunsetEvent(t time.Time) {
