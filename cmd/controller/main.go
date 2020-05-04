@@ -1,67 +1,38 @@
 package main
 
 import (
-	"encoding/json"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 
-	"github.com/gmulders/lights"
+	"github.com/fsnotify/fsnotify"
+	"github.com/spf13/viper"
 	nats "github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
-	sunsetLights = []lights.Light{
-		lights.Light{
-			ID:  2,
-			On:  true,
-			Bri: 170,
-			Sat: 0,
-		},
-		lights.Light{
-			ID:  5,
-			On:  true,
-			Bri: 254,
-		},
-		lights.Light{
-			ID:  6,
-			On:  true,
-		},
-	}
-
-	time2030Lights = []lights.Light{
-		lights.Light{
-			ID: 2,
-			On: false,
-		},
-	}
-
-	time2045Lights = []lights.Light{
-		lights.Light{
-			ID:  6,
-			On:  false,
-		},
-	}
-
-	time2100Lights = []lights.Light{
-		lights.Light{
-			ID: 5,
-			On: false,
-		},
-	}
+	actionMap map[string][]eventAction
+	nc *nats.Conn
 )
 
 func main() {
+	if err := readConfig(); err != nil {
+		log.Errorf("Could not read config: %v", err)
+		return
+	}
+
+	var err error
+
 	// Connect to NATS
-	nc, err := nats.Connect(nats.DefaultURL)
+	nc, err = nats.Connect(nats.DefaultURL)
 	if err != nil {
 		log.Fatalf("Could not connect to NATS: %v", err)
 	}
-
 	defer nc.Close()
 
-	nc.Subscribe("sunset", func(msg *nats.Msg) {
-		log.Info("Received sunset event")
-		updateLights(nc, sunsetLights)
-	})
+	nc.Subscribe("time-minute", processEvent(parseTimeMinute))
 
 	nc.Flush()
 
@@ -69,29 +40,48 @@ func main() {
 		log.Errorf("Unexpected exception from NATS: %v", err)
 	}
 
-	for t := range lights.MinuteTicker().C {
-		currentTimeOnly := t.Hour()*100 + t.Minute()
-		if currentTimeOnly == 2030 {
-			updateLights(nc, time2030Lights)
-		} else if currentTimeOnly == 2045 {
-			updateLights(nc, time2045Lights)
-		} else if currentTimeOnly == 2100 {
-			updateLights(nc, time2100Lights)
-		}
-
-		nc.Flush()
-	}
+	termChan := make(chan os.Signal)
+	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
+	<-termChan // Blocks here until either SIGINT or SIGTERM is received.
 }
 
-func updateLights(nc *nats.Conn, lights []lights.Light) {
-	bytes, err := json.Marshal(lights)
+func readConfig() error {
+	viper.SetConfigName("config")
+	viper.BindEnv("hue.username")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
+	viper.AddConfigPath(".")
+	err := viper.ReadInConfig()
 	if err != nil {
-		log.Errorf("Could not marshal to JSON %v", err)
-		return
+		return err
+	}
+	buildActionMap()
+
+	viper.WatchConfig()
+	viper.OnConfigChange(func(event fsnotify.Event) {
+		if event.Op != fsnotify.Write {
+			return
+		}
+		buildActionMap()
+	})
+
+	return nil
+}
+
+func buildActionMap() error {
+	actions := make([]eventAction, 0)
+	if err := viper.UnmarshalKey("actions", &actions); err != nil {
+		return err
 	}
 
-	log.Infof("Sending request for 'lights-update' %s", string(bytes))
+	actionMap = map[string][]eventAction{}
 
-	nc.Publish("lights-update", bytes)
+	for i := 0; i < len(actions); i++ {
+		action := actions[i]
+		actionMap[action.Subject] = append(actionMap[action.Subject], action)
+	}
+
+	log.Infof("Config: %v", actionMap)
+
+	return nil
 }

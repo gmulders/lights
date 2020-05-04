@@ -1,0 +1,30 @@
+actions:
+  - subject: time-minute
+    trigger: false
+    triggerExpr: SunSetsTimePlusMinutes(52.09083, 05.12222, 30)
+    resultEvent: lights-update
+    action:
+      id: 6
+      "on": true
+  - subject: time-minute
+    trigger: false
+    triggerExpr: SunSetsTimePlusMinutes(52.09083, 05.12222, 35)
+    resultEvent: lights-update
+    action:
+      id: 5
+      "on": true
+      bri: 254
+  - subject: time-minute
+    trigger: false
+    triggerExpr: TimeEquals(21, 45)
+    resultEvent: lights-update
+    action:
+      id: 6
+      "on": false
+  - subject: time-minute
+    trigger: false
+    triggerExpr: TimeEquals(22, 00)
+    resultEvent: lights-update
+    action:
+      id: 5
+      "on": false
