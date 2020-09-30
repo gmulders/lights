@@ -36,18 +36,18 @@ func (event timeMinuteEvent) SunSetsTimePlusMinutes(lat float64, lon float64, mi
 	_, sunset, err := p.GetSunriseSunset()
 
 	if err != nil {
-		log.Infof("Could not determine sunset: %v", err)
+		log.Errorf("Could not determine sunset: %v", err)
 		return false
 	}
 
 	result := t.Hour() == sunset.Hour() && t.Minute() == sunset.Minute()
-	log.Infof("The result of SunSetsTimePlusMinutes: %v", result)
+	log.Debugf("The result of SunSetsTimePlusMinutes: %v", result)
 	return result
 }
 
 func (event timeMinuteEvent) TimeEquals(hour int, minute int) bool {
 	t := event.Time
 	result := t.Hour() == hour && t.Minute() == minute
-	log.Infof("The result of TimeEquals: %v", result)
+	log.Debugf("The result of TimeEquals: %v", result)
 	return result
 }

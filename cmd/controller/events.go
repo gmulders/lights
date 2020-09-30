@@ -27,12 +27,16 @@ func triggersEvent(ep *eventAction, event interface{}) bool {
 		return false
 	}
 	if ep.TriggerProg == nil {
+		log.Debugf("Compiling expression: %s", ep.TriggerExpr)
 		program, err := expr.Compile(ep.TriggerExpr, expr.Env(event))
 		if err != nil {
 			log.Errorf("Could not compile expression: %v", err)
 			return false
 		}
 		ep.TriggerProg = program
+	} else {
+		// Currently this is never executed because golang "passes by value"
+		log.Info("Expression is compiled")
 	}
 
 	output, err := expr.Run(ep.TriggerProg, event)
@@ -58,7 +62,9 @@ func processEvent(parser func (data []byte) (interface{}, error)) func (msg *nat
 		for i := 0; i < len(eventActions); i++ {
 			eventAction := eventActions[i]
 			trigger := triggersEvent(&eventAction, value)
-			log.Infof("%v", trigger)
+			if log.IsLevelEnabled(log.DebugLevel) {
+				log.Debugf("Event action gets triggered: %v", trigger)
+			}
 			if trigger {
 				executeEventAction(&eventAction)
 			}
@@ -67,6 +73,7 @@ func processEvent(parser func (data []byte) (interface{}, error)) func (msg *nat
 }
 
 func executeEventAction(action *eventAction) {
+	log.Debugf("Type: %v", action.Action)
 	bytes, err := json.Marshal(convertInterface(action.Action))
 
 	if err != nil {
@@ -85,6 +92,12 @@ func convertInterface(i interface{}) interface{} {
 	switch v := i.(type) {
 	case map[interface{}]interface{}:
 		return convertMap(v)
+	case []interface{}:
+		a := make([]interface{}, len(v))
+		for i := 0; i < len(v); i++ {
+			a[i] = convertInterface(v[i])
+		}
+		return a
 	default:
 		return i
 	}
